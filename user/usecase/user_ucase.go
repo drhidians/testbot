@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/dhidians/testbot/models"
+	"github.com/drhidians/testbot/models"
 
-	"github.com/dhidians/testbot/user"
+	"github.com/drhidians/testbot/user"
 
-	"github.com/dhidians/testbot/bot"
+	"github.com/drhidians/testbot/bot"
 )
 
 type userUsecase struct {
