@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/drhidians/testbot/models"
@@ -11,14 +12,23 @@ import (
 	"github.com/drhidians/testbot/bot"
 )
 
+var ErrUserNotFound = errors.New("invalid credentials")
+
+// Service represent the user's usecases
+type Service interface {
+	Store(ctx context.Context, user *models.User) error
+	GetByID(ctx context.Context, id int64) (*models.User, error)
+	GetBot(c context.Context) (*models.Bot, error)
+}
+
 type userUsecase struct {
 	userRepo       user.Repository
 	botRepo        bot.Repository
 	contextTimeout time.Duration
 }
 
-// NewUserUsecase will create new an userUsecase object representation of user.Usecase interface
-func NewUserUsecase(ur user.Repository, br bot.Repository, timeout time.Duration) user.Usecase {
+// NewUserService will create new an userUsecase object representation of user.Usecase interface
+func NewUserService(ur user.Repository, br bot.Repository, timeout time.Duration) Service {
 	return &userUsecase{
 		userRepo:       ur,
 		botRepo:        br,
@@ -48,6 +58,18 @@ func (a *userUsecase) GetByID(c context.Context, id int64) (*models.User, error)
 		return nil, err
 	}
 
-	res.User = *resUser
-	return res, nil
+	return resUser, nil
+}
+
+func (a *userUsecase) GetBot(c context.Context) (*models.Bot, error) {
+
+	ctx, cancel := context.WithTimeout(c, a.contextTimeout)
+	defer cancel()
+
+	resUser, err := a.botRepo.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return resUser, nil
 }

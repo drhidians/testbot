@@ -5,16 +5,16 @@ import (
 	"encoding/json"
 	"net/http"
 
+	botUcase "github.com/drhidians/testbot/bot/usecase"
+	userUcase "github.com/drhidians/testbot/user/usecase"
 	"github.com/go-chi/chi"
-	"github.com/drhidians/testbot/bot"
-	"github.com/drhidians/testbot/user"
 	kitlog "github.com/go-kit/kit/log"
 )
 
 // Server holds the dependencies for a HTTP server.
 type Server struct {
-	Bot  bot.Service
-	BotApi botapi.Service
+	Bot  botUcase.Service
+	User userUcase.Service
 
 	Logger kitlog.Logger
 
@@ -22,11 +22,11 @@ type Server struct {
 }
 
 // New returns a new HTTP server.
-func New(bot bot.Service,api api.Service, logger kitlog.Logger) *Server {
+func New(bot botUcase.Service, user userUcase.Service, logger kitlog.Logger, jwtToken string) *Server {
 	s := &Server{
-		Bot:  bot,
-		Api: api
-		Logger:   logger,
+		Bot:    bot,
+		User:   user,
+		Logger: logger,
 	}
 
 	r := chi.NewRouter()
@@ -37,9 +37,12 @@ func New(bot bot.Service,api api.Service, logger kitlog.Logger) *Server {
 		h := botHandler{s.Bot, s.Logger}
 		r.Mount("/", h.router())
 	})
-	r.Route("/api", func(r chi.Router) {
-		h := apiHandler{s.Api, s.Logger}
-		r.Mount("/v1", h.router())
+	r.Route("/api/v1", func(r chi.Router) {
+		h := apiHandler{s.User, s.Logger, jwtToken}
+		r.Mount("/", h.router())
+	})
+	r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("pong"))
 	})
 
 	s.router = r
@@ -68,10 +71,8 @@ func accessControl(h http.Handler) http.Handler {
 func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	switch err {
-	case shipping.ErrUnknownCargo:
+	case userUcase.ErrUserNotFound:
 		w.WriteHeader(http.StatusNotFound)
-	case tracking.ErrInvalidArgument:
-		w.WriteHeader(http.StatusBadRequest)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}

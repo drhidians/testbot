@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/drhidians/testbot/models"
 
 	"github.com/drhidians/testbot/server"
 
@@ -20,15 +23,21 @@ import (
 
 	_userRepo "github.com/drhidians/testbot/user/repository"
 	_userUcase "github.com/drhidians/testbot/user/usecase"
+
+	_botRepo "github.com/drhidians/testbot/bot/repository"
+	_botUcase "github.com/drhidians/testbot/bot/usecase"
+
+	tg "github.com/drhidians/testbot/telegram"
 )
 
 func init() {
 	viper.AutomaticEnv()
-
 	pflag.String("db", viper.GetString("TESTBOT_db"), "строка для подключения к базе данных (postgres://user:pass@host:port/dbname)")
 	pflag.Int("db-max-open-conns", viper.GetInt("TESTBOT_db-max-open-conns"), "максимальный размер пула подключений к БД")
 	pflag.Int("db-max-idle-conns", viper.GetInt("TESTBOT_db-max-idle-conns"), "максимальное кол-во простаювающих соеденений к БД")
 	pflag.String("secret", viper.GetString("TESTBOT_secret"), "секрет для подписи JWT-токенов")
+	pflag.String("bot-token", viper.GetString("TESTBOT_bot-token"), "токен бота полученный у @BotFather")
+	pflag.Int("bot-webhook-max-conns", viper.GetInt("TESTBOT_bot-webhook-max-conns"), "максимальное количество параллельных HTTP-соединении от Telegram-сервера для бота")
 	pflag.String("addr", viper.GetString("TESTBOT_addr"), "адресс на котром будет запущен сервер (:8000, localhost:8000, ...)")
 	pflag.String("domain", viper.GetString("TESTBOT_domain"), "домен на который будет установлен вебхук и который нужно использовать при построений абсолютных URL.")
 
@@ -43,8 +52,8 @@ func main() {
 	var logger log.Logger
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
-
-	db, err := sql.Open("postgres", viper.GetString("db"))
+	fmt.Println(viper.GetString("db") + "?sslmode=disable")
+	db, err := sql.Open("postgres", viper.GetString("db")+"?sslmode=disable")
 	if err != nil {
 		panic(err)
 	}
@@ -57,6 +66,8 @@ func main() {
 		panic(err)
 	}
 
+	models.Migrate(db)
+
 	defer func() {
 		err := db.Close()
 		if err != nil {
@@ -64,26 +75,58 @@ func main() {
 		}
 	}()
 
+	ctx := context.Background()
+	b, err := tg.NewBot(ctx, viper.GetString("bot-token"), tg.WithoutUpdates())
+	if err != nil {
+		panic(err)
+	}
+	b.GetWebhookInfo(ctx)
+	fmt.Println(b)
+	/*bot, err := tgbotapi.NewBotAPI(viper.GetString("bot-token"))
+	if err != nil {
+		panic(err)
+	}
+
+	bot.Debug = true
+	info, err := bot.GetWebhookInfo()
+
+	if err != nil {
+		panic(err)
+	}
+	if info.URL != viper.GetString("domain")+"/bot/webhook" {
+		webhookConfig := tgbotapi.NewWebhook(viper.GetString("domain") + "/bot/webhook")
+		webhookConfig.MaxConnections = viper.GetInt("bot-webhook-max-conns")
+		_, err = bot.SetWebhook(webhookConfig)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	if info.LastErrorDate != 0 {
+		logger.Log("Telegram callback failed: %s", info.LastErrorMessage)
+		os.Exit(1)
+	}*/
+
 	userRepo := _userRepo.NewPostgresUserRepository(db)
+	botRepo := _botRepo.NewPostgresBotRepository(db)
+
 	timeoutContext := time.Duration(viper.GetInt("context.timeout")) * time.Second
 
-	uu := _userUcase.NewUserUseCase(userRepo, botRepo, timeoutContext)
+	us := _userUcase.NewUserService(userRepo, botRepo, timeoutContext)
+	us = _userUcase.NewLoggingService(logger, us)
 
-	//TO DO . Use of context for test purposes. DELETE AFTER
+	bs := _botUcase.NewBotService(userRepo, botRepo, nil, timeoutContext)
+	bs = _botUcase.NewLoggingService(logger, bs)
 
-	/*authorRepo := _authorRepo.NewMysqlAuthorRepository(dbConn)
-	ar := _articleRepo.NewMysqlArticleRepository(dbConn)
+	srv := server.New(bs, us, log.With(logger, "component", "http"), viper.GetString("secret"))
 
-
-	au := _articleUcase.NewArticleUsecase(ar, authorRepo, timeoutContext)
-	_articleHttpDeliver.NewArticleHandler(e, au)
-	*/
-	srv := server.New(bs, ts, hs, log.With(logger, "component", "http"))
 	errs := make(chan error, 2)
+
 	go func() {
 		logger.Log("transport", "http", "address", viper.GetString("addr"), "msg", "listening")
 		errs <- http.ListenAndServe(viper.GetString("addr"), srv)
 	}()
+
 	go func() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, syscall.SIGINT)

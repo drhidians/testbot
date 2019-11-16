@@ -41,7 +41,25 @@ func (p *postgresUserRepository) Store(ctx context.Context, u *models.User) (err
 		return
 	}
 
-	res, err := stmt.ExecContext(ctx, u.ExternalID, u.Username, u.Name, u.Avatar, u.Language, u.JoinedAt, u.UpdatedAt)
+	res, err := stmt.ExecContext(ctx, u.ExternalID, u.Username, u.Name, u.Avatar, u.Language, u.CreatedAt, u.UpdatedAt)
+
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	u.ID = lastID
+	return
+}
+
+func (p *postgresUserRepository) GetBot(ctx context.Context) (bot *models.Bot, err error) {
+	query := `SELECT * FROM bot WHERE ID = 1`
+
+	err = p.Conn.QueryRowContext(ctx, query).Scan(&bot)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return
 }

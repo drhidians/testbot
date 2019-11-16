@@ -4,38 +4,80 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"time"
 
+	"github.com/drhidians/testbot/server/jwtauth"
+	userUcase "github.com/drhidians/testbot/user/usecase"
 	"github.com/go-chi/chi"
 	kitlog "github.com/go-kit/kit/log"
-
 )
 
-type botHandler struct {
-	s booking.Service
+var tokenAuth *jwtauth.JWTAuth
 
-	logger kitlog.Logger
+type apiHandler struct {
+	s userUcase.Service
+
+	logger   kitlog.Logger
+	jwtToken string
 }
 
-func (h *bookingHandler) router() chi.Router {
+func (h *apiHandler) router() chi.Router {
 	r := chi.NewRouter()
 
-	r.Route("/cargos", func(r chi.Router) {
-		r.Post("/", h.bookCargo)
-		r.Get("/", h.listCargos)
-		r.Route("/{trackingID}", func(r chi.Router) {
-			r.Get("/", h.loadCargo)
-			r.Get("/request_routes", h.requestRoutes)
-			r.Post("/assign_to_route", h.assignToRoute)
-			r.Post("/change_destination", h.changeDestination)
-		})
+	r.Get("/bot", h.GetBot)
 
+	tokenAuth = jwtauth.New("HS256", []byte(h.jwtToken), nil)
+
+	// Protected routes
+	r.Group(func(r chi.Router) {
+		// Seek, verify and validate JWT tokens
+
+		r.Use(jwtauth.Verifier(tokenAuth))
+		r.Use(jwtauth.Authenticator)
+
+		r.Get("/user", h.GetUser)
 	})
-	r.Get("/locations", h.listLocations)
-
-	r.Method("GET", "/docs", http.StripPrefix("/booking/v1/docs", http.FileServer(http.Dir("booking/docs"))))
-
 	return r
 }
 
+func (h *apiHandler) GetBot(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
+	b, err := h.s.GetBot(ctx)
+
+	if err != nil {
+		encodeError(ctx, err, w)
+		return
+	}
+
+	var response = b
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		h.logger.Log("error", err)
+		encodeError(ctx, err, w)
+		return
+	}
+}
+
+func (h *apiHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	id := claims["id"].(int64)
+
+	u, err := h.s.GetByID(ctx, id)
+
+	if err != nil {
+		encodeError(ctx, err, w)
+		return
+	}
+
+	var response = u
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		h.logger.Log("error", err)
+		encodeError(ctx, err, w)
+		return
+	}
 }
