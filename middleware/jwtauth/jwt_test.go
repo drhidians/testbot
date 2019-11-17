@@ -14,7 +14,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/drhidians/testbot/server/jwtauth"
+	"github.com/drhidians/testbot/middleware/jwtauth"
 	"github.com/go-chi/chi"
 )
 

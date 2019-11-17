@@ -44,13 +44,16 @@ type Result struct {
 type From struct {
 	ID           int    `json:"id"`
 	FirstName    string `json:"first_name"`
+	LastName     string `json:"last_name"`
 	UserName     string `json:"username"`
 	LanguageCode string `json:"language_code"`
+	IsBot        string `json:"is_bot"`
+	Type         string `json:"type"`
 }
 
 // Chat struct
 type Chat struct {
-	ID                          int    `json:"id"`
+	ID                          int64  `json:"id"`
 	FirstName                   string `json:"first_name"`
 	UserName                    string `json:"username"`
 	Type                        string `json:"type"`

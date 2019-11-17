@@ -6,7 +6,8 @@ import (
 	"net/http"
 
 	botUcase "github.com/drhidians/testbot/bot/usecase"
-	"github.com/drhidians/testbot/server/ipchecker"
+	"github.com/drhidians/testbot/middleware/ipchecker"
+	tg "github.com/drhidians/testbot/telegram"
 	"github.com/go-chi/chi"
 	kitlog "github.com/go-kit/kit/log"
 )
@@ -25,26 +26,28 @@ func (h *botHandler) router() chi.Router {
 
 		r.Use(ipchecker.Check)
 
-		r.Get("/", h.Start)
+		r.Post("/", h.Update)
 	})
 	return r
 }
 
-func (h *botHandler) Start(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+func (h *botHandler) Update(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
-	u, err := h.s.Get(ctx)
+	var upd tg.Update
+	err := json.NewDecoder(r.Body).Decode(&upd)
 
 	if err != nil {
 		encodeError(ctx, err, w)
 		return
 	}
 
-	var response = u
+	err = h.s.Update(ctx, upd)
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		h.logger.Log("error", err)
+	if err != nil {
 		encodeError(ctx, err, w)
 		return
 	}

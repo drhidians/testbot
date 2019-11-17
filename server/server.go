@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	botUcase "github.com/drhidians/testbot/bot/usecase"
+	"github.com/drhidians/testbot/middleware/jwtauth"
 	userUcase "github.com/drhidians/testbot/user/usecase"
 	"github.com/go-chi/chi"
 	kitlog "github.com/go-kit/kit/log"
@@ -21,13 +22,17 @@ type Server struct {
 	router chi.Router
 }
 
+var tokenAuth *jwtauth.JWTAuth
+
 // New returns a new HTTP server.
-func New(bot botUcase.Service, user userUcase.Service, logger kitlog.Logger, jwtToken string) *Server {
+func New(bot botUcase.Service, user userUcase.Service, logger kitlog.Logger, jwtToken *jwtauth.JWTAuth) *Server {
 	s := &Server{
 		Bot:    bot,
 		User:   user,
 		Logger: logger,
 	}
+
+	tokenAuth = jwtToken
 
 	r := chi.NewRouter()
 
@@ -37,8 +42,8 @@ func New(bot botUcase.Service, user userUcase.Service, logger kitlog.Logger, jwt
 		h := botHandler{s.Bot, s.Logger}
 		r.Mount("/", h.router())
 	})
-	r.Route("/api/v1", func(r chi.Router) {
-		h := apiHandler{s.User, s.Logger, jwtToken}
+	r.Route("/", func(r chi.Router) {
+		h := apiHandler{s.User, s.Logger}
 		r.Mount("/", h.router())
 	})
 	r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {

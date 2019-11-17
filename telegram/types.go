@@ -35,6 +35,13 @@ type WebhookInfo struct {
 	AllowedUpdates       []string `json:"allowed_updates"`
 }
 
+// https://core.telegram.org/bots/api#webhookconfig
+type WebhookConfig struct {
+	URL string `json:"url"`
+	//Certificate    interface{}
+	MaxConnections int `json:"max_conenction"`
+}
+
 // Available types
 // https://core.telegram.org/bots/api#available-types
 
@@ -200,9 +207,21 @@ type Venue struct {
 }
 
 // https://core.telegram.org/bots/api#userprofilephotos
+type UserProfilePhotosConfig struct {
+	UserID int `json:"user_id"`
+	Offset int `json:"offset"`
+	Limit  int `json:"limit"`
+}
+
+// https://core.telegram.org/bots/api#userprofilephotos
 type UserProfilePhotos struct {
 	TotalCount int            `json:"total_count"`
 	Photos     [][]*PhotoSize `json:"photos"`
+}
+
+// https://core.telegram.org/bots/api#file
+type FileConfig struct {
+	FileID string `json:"file_id"`
 }
 
 // https://core.telegram.org/bots/api#file

@@ -1,31 +1,37 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
+	"os"
+	"time"
 
-	"github.com/drhidians/testbot/server/jwtauth"
+	"github.com/drhidians/testbot/middleware/jwtauth"
 	userUcase "github.com/drhidians/testbot/user/usecase"
 	"github.com/go-chi/chi"
 	kitlog "github.com/go-kit/kit/log"
 )
 
-var tokenAuth *jwtauth.JWTAuth
-
 type apiHandler struct {
 	s userUcase.Service
 
-	logger   kitlog.Logger
-	jwtToken string
+	logger kitlog.Logger
 }
 
 func (h *apiHandler) router() chi.Router {
 	r := chi.NewRouter()
 
-	r.Get("/bot", h.GetBot)
+	r.Route("/media/{fileID}", func(r chi.Router) {
+		//r.Use(ArticleCtx)
+		r.Get("/", h.GetFile) // GET /articles/123
 
-	tokenAuth = jwtauth.New("HS256", []byte(h.jwtToken), nil)
+	})
+
+	r.Get("/bot", h.GetBot)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
@@ -40,7 +46,10 @@ func (h *apiHandler) router() chi.Router {
 }
 
 func (h *apiHandler) GetBot(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	b, err := h.s.GetBot(ctx)
 
@@ -60,12 +69,16 @@ func (h *apiHandler) GetBot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *apiHandler) GetUser(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	_, claims, _ := jwtauth.FromContext(r.Context())
-	id := claims["id"].(int64)
 
-	u, err := h.s.GetByID(ctx, id)
+	id := int(claims["id"].(float64))
+
+	u, err := h.s.GetByTelegramID(ctx, id)
 
 	if err != nil {
 		encodeError(ctx, err, w)
@@ -80,4 +93,49 @@ func (h *apiHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 		encodeError(ctx, err, w)
 		return
 	}
+}
+
+func (h *apiHandler) GetFile(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	fileID := chi.URLParam(r, "fileID")
+
+	//TO DO need to implement error
+	if fileID == "" {
+		encodeError(ctx, errors.New("Bad Request"), w)
+		return
+	}
+
+	fileB, err := h.s.GetAvatar(ctx, fileID)
+	if err != nil {
+		encodeError(ctx, err, w)
+		return
+	}
+	w.Header().Set("Content-Disposition", "attachment; filename=avatar.png")
+	w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
+	http.ServeContent(w, r, "avatar.png", time.Now(), bytes.NewReader(fileB))
+}
+
+func downloadFile(filepath string, url string) error {
+
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	return err
 }

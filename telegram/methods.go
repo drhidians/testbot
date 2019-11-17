@@ -24,13 +24,19 @@ func (b *bot) GetUpdates(ctx context.Context, opts ...UpdatesOption) ([]*Update,
 	return v, nil
 }
 
-// SetWebhook
-func (b *bot) SetWebhook(ctx context.Context) (*User, error) {
-	var u *User
-	if err := b.do(ctx, "getMe", nil, &u); err != nil {
-		return nil, err
+// NewWebhook
+func (b *bot) NewWebhook(link string, max_connection int) WebhookConfig {
+
+	return WebhookConfig{
+		URL:            link,
+		MaxConnections: max_connection,
 	}
-	return u, nil
+}
+
+// SetWebhook
+func (b *bot) SetWebhook(ctx context.Context, config WebhookConfig) error {
+
+	return b.do(ctx, "setWebhook", config, nil)
 }
 
 // DeleteWebhook
@@ -71,7 +77,45 @@ func (b *bot) GetMe(ctx context.Context) (*User, error) {
 // }
 
 // GetUserProfilePhotos
+func (b *bot) GetUserProfilePhotos(ctx context.Context, config UserProfilePhotosConfig) (*UserProfilePhotos, error) {
+
+	var up *UserProfilePhotos
+	err := b.do(ctx, "getUserProfilePhotos", config, &up)
+	if err != nil {
+		return nil, err
+	}
+
+	return up, err
+}
+
 // GetFile
+func (b *bot) GetFile(ctx context.Context, config FileConfig) (*File, error) {
+	var f *File
+	err := b.do(ctx, "getFile", config, &f)
+	if err != nil {
+		return nil, err
+	}
+
+	return f, err
+}
+
+// GetFileDirectURL
+func (b *bot) GetFileDirectURL(ctx context.Context, config FileConfig) (*string, error) {
+	file, err := b.GetFile(ctx, config)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if file.FilePath == nil {
+		//TO DO
+		return nil, errors.New("empty file path")
+	}
+
+	directURL := b.fileurl + "/" + *file.FilePath
+	return &directURL, nil
+}
+
 // KickChatMember
 // UnbanChatMember
 // RestrictChatMember

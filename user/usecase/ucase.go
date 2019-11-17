@@ -5,11 +5,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/drhidians/testbot/bot"
 	"github.com/drhidians/testbot/models"
 
 	"github.com/drhidians/testbot/user"
-
-	"github.com/drhidians/testbot/bot"
 )
 
 var ErrUserNotFound = errors.New("invalid credentials")
@@ -17,14 +16,15 @@ var ErrUserNotFound = errors.New("invalid credentials")
 // Service represent the user's usecases
 type Service interface {
 	Store(ctx context.Context, user *models.User) error
-	GetByID(ctx context.Context, id int64) (*models.User, error)
+	GetByTelegramID(ctx context.Context, id int) (*models.User, error)
 	GetBot(c context.Context) (*models.Bot, error)
+	GetAvatar(context.Context, string) ([]byte, error)
 }
 
 type userUsecase struct {
 	userRepo       user.Repository
-	botRepo        bot.Repository
 	contextTimeout time.Duration
+	botRepo        bot.Repository
 }
 
 // NewUserService will create new an userUsecase object representation of user.Usecase interface
@@ -48,12 +48,12 @@ func (a *userUsecase) Store(c context.Context, u *models.User) error {
 	return nil
 }
 
-func (a *userUsecase) GetByID(c context.Context, id int64) (*models.User, error) {
+func (a *userUsecase) GetByTelegramID(c context.Context, tgID int) (*models.User, error) {
 
 	ctx, cancel := context.WithTimeout(c, a.contextTimeout)
 	defer cancel()
 
-	resUser, err := a.userRepo.GetByID(ctx, id)
+	resUser, err := a.userRepo.GetByTelegramID(ctx, tgID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,4 +72,14 @@ func (a *userUsecase) GetBot(c context.Context) (*models.Bot, error) {
 	}
 
 	return resUser, nil
+}
+
+func (a *userUsecase) GetAvatar(c context.Context, avatarID string) ([]byte, error) {
+
+	ctx, cancel := context.WithTimeout(c, a.contextTimeout)
+	defer cancel()
+
+	file, err := a.botRepo.GetFile(ctx, avatarID)
+
+	return file, err
 }

@@ -2,7 +2,6 @@ package ipchecker
 
 import (
 	"bytes"
-	"fmt"
 	"net"
 	"net/http"
 )
@@ -17,9 +16,14 @@ var t2 = net.ParseIP("91.108.8.255")
 //Check checks if incoming request is coming from telegram subnets
 func Check(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		IPAddress := r.Header.Get("X-Real-Ip")
+		if IPAddress == "" {
+			IPAddress = r.Header.Get("X-Forwarded-For")
+		}
+		if IPAddress == "" {
+			IPAddress = r.RemoteAddr
+		}
 
-		IPAddress := r.RemoteAddr
-		fmt.Println(IPAddress)
 		if !check(IPAddress) {
 			return
 		}
@@ -31,17 +35,24 @@ func Check(next http.Handler) http.Handler {
 
 //check checks if ip belongs to telegram subnet
 func check(ip string) bool {
-	trial := net.IP(ip)
-	return ipBetween(f1, t1, trial) && ipBetween(f2, t2, trial)
+	trial := net.ParseIP(ip)
+	return ipBetween(f1, t1, trial) || ipBetween(f2, t2, trial)
 }
 
-func ipBetween(from, to, trial net.IP) bool {
-	if trial.To4() == nil {
+func ipBetween(from net.IP, to net.IP, test net.IP) bool {
+	if from == nil || to == nil || test == nil {
 		return false
 	}
-	if bytes.Compare(trial, from) >= 0 && bytes.Compare(trial, to) <= 0 {
-		return true
+
+	from16 := from.To16()
+	to16 := to.To16()
+	test16 := test.To16()
+	if from16 == nil || to16 == nil || test16 == nil {
+		return false
 	}
 
+	if bytes.Compare(test16, from16) >= 0 && bytes.Compare(test16, to16) <= 0 {
+		return true
+	}
 	return false
 }

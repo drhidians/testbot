@@ -9,8 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/drhidians/testbot/models"
-
+	"github.com/drhidians/testbot/middleware/jwtauth"
 	"github.com/drhidians/testbot/server"
 
 	"github.com/go-kit/kit/log"
@@ -52,7 +51,7 @@ func main() {
 	var logger log.Logger
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
-	fmt.Println(viper.GetString("db") + "?sslmode=disable")
+
 	db, err := sql.Open("postgres", viper.GetString("db")+"?sslmode=disable")
 	if err != nil {
 		panic(err)
@@ -66,8 +65,6 @@ func main() {
 		panic(err)
 	}
 
-	models.Migrate(db)
-
 	defer func() {
 		err := db.Close()
 		if err != nil {
@@ -76,49 +73,42 @@ func main() {
 	}()
 
 	ctx := context.Background()
-	b, err := tg.NewBot(ctx, viper.GetString("bot-token"), tg.WithoutUpdates())
-	if err != nil {
-		panic(err)
-	}
-	b.GetWebhookInfo(ctx)
-	fmt.Println(b)
-	/*bot, err := tgbotapi.NewBotAPI(viper.GetString("bot-token"))
+
+	b, err := tg.NewBot(ctx, viper.GetString("bot-token"))
 	if err != nil {
 		panic(err)
 	}
 
-	bot.Debug = true
-	info, err := bot.GetWebhookInfo()
+	w, err := b.GetWebhookInfo(ctx)
 
 	if err != nil {
 		panic(err)
 	}
-	if info.URL != viper.GetString("domain")+"/bot/webhook" {
-		webhookConfig := tgbotapi.NewWebhook(viper.GetString("domain") + "/bot/webhook")
-		webhookConfig.MaxConnections = viper.GetInt("bot-webhook-max-conns")
-		_, err = bot.SetWebhook(webhookConfig)
+
+	domainURL := "https://" + viper.GetString("domain") + "/"
+	webhookURL := domainURL + "bot/webhook"
+	if w.URL != webhookURL {
+		webhookConfig := b.NewWebhook(webhookURL, viper.GetInt("bot-webhook-max-conns"))
+		err = b.SetWebhook(ctx, webhookConfig)
 		if err != nil {
 			panic(err)
 		}
 	}
 
-	if info.LastErrorDate != 0 {
-		logger.Log("Telegram callback failed: %s", info.LastErrorMessage)
-		os.Exit(1)
-	}*/
+	tokenAuth := jwtauth.New("HS256", []byte(viper.GetString("secret")), nil)
 
 	userRepo := _userRepo.NewPostgresUserRepository(db)
-	botRepo := _botRepo.NewPostgresBotRepository(db)
+	botRepo := _botRepo.NewBotRepository(b, tokenAuth, domainURL)
 
 	timeoutContext := time.Duration(viper.GetInt("context.timeout")) * time.Second
+
+	bs := _botUcase.NewBotService(userRepo, botRepo, timeoutContext)
+	bs = _botUcase.NewLoggingService(logger, bs)
 
 	us := _userUcase.NewUserService(userRepo, botRepo, timeoutContext)
 	us = _userUcase.NewLoggingService(logger, us)
 
-	bs := _botUcase.NewBotService(userRepo, botRepo, nil, timeoutContext)
-	bs = _botUcase.NewLoggingService(logger, bs)
-
-	srv := server.New(bs, us, log.With(logger, "component", "http"), viper.GetString("secret"))
+	srv := server.New(bs, us, log.With(logger, "component", "http"), tokenAuth)
 
 	errs := make(chan error, 2)
 

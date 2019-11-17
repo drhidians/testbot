@@ -131,9 +131,10 @@ func run(commands []*command) error {
 }
 
 type command struct {
-	Func    CommandFunc
-	Command *Command
-	Update  *Update
+	Func        CommandFunc
+	Command     *Command
+	Update      *Update
+	ExtraParams interface{}
 }
 
 // Run executes the handler with the cmd and send error on errc.

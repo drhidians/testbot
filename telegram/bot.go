@@ -23,6 +23,7 @@ const jsonContentType = "application/json;chartset=utf-8"
 
 const (
 	defaultURL         = "https://api.telegram.org/bot"
+	fileURL            = "https://api.telegram.org/file/bot"
 	defaultErrTimeout  = 5 * time.Second
 	defaultPollTimeout = time.Minute
 )
@@ -54,6 +55,12 @@ type Bot interface {
 	EditMessageCaption(context.Context, *MessageCaption) (*Message, error)
 	EditMessageReplyMarkup(context.Context, *MessageReplyMarkup) (*Message, error)
 	DeleteMessage(context.Context, *DeletedMessage) error
+	GetWebhookInfo(context.Context) (*WebhookInfo, error)
+	NewWebhook(string, int) WebhookConfig
+	SetWebhook(context.Context, WebhookConfig) error
+	GetUserProfilePhotos(context.Context, UserProfilePhotosConfig) (*UserProfilePhotos, error)
+	GetFile(context.Context, FileConfig) (*File, error)
+	GetFileDirectURL(context.Context, FileConfig) (*string, error)
 }
 
 func NewBot(ctx context.Context, token string, opts ...BotOption) (Bot, error) {
@@ -119,6 +126,7 @@ func WithoutUpdates() BotOption {
 type bot struct {
 	username    string
 	url         string
+	fileurl     string
 	ctx         context.Context
 	client      *http.Client
 	errTimeout  time.Duration
@@ -139,6 +147,7 @@ func newBot(ctx context.Context, token string, opts ...BotOption) *bot {
 	b := &bot{
 		username:    o.Username,
 		url:         o.URL + token,
+		fileurl:     fileURL + token,
 		ctx:         ctx,
 		client:      client,
 		errTimeout:  o.ErrTimeout,
@@ -234,6 +243,7 @@ func (b *bot) do(ctx context.Context, method string, data interface{}, v interfa
 	url := b.url + "/" + method
 
 	body, contentType, err := b.encode(data)
+
 	if err != nil {
 		return err
 	}
@@ -261,6 +271,9 @@ func (b *bot) do(ctx context.Context, method string, data interface{}, v interfa
 		}
 	}
 
+	if v == nil {
+		return nil
+	}
 	return json.Unmarshal([]byte(r.Result), v)
 }
 
@@ -272,6 +285,7 @@ func post(ctx context.Context, client *http.Client, url, bodyType string, body i
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("Content-Type", bodyType)
 	return do(ctx, client, req)
 }
@@ -309,6 +323,7 @@ func (b *bot) encode(data interface{}) (io.Reader, string, error) {
 		}
 	}
 	buf := new(bytes.Buffer)
+
 	if err := json.NewEncoder(buf).Encode(data); err != nil {
 		return nil, "", err
 	}

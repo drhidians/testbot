@@ -5,64 +5,60 @@ import (
 	"time"
 
 	"github.com/drhidians/testbot/models"
-
 	"github.com/drhidians/testbot/user"
 
 	"github.com/drhidians/testbot/bot"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	tg "github.com/drhidians/testbot/telegram"
 )
 
 // Service represent the bot's usecases
 type Service interface {
-	Store(ctx context.Context, bot *models.Bot) error
-	Get(ctx context.Context) (*models.Bot, error)
+	Update(context.Context, tg.Update) error
+	Get(context.Context) (*models.Bot, error)
 }
 
 type botUsecase struct {
 	userRepo       user.Repository
 	botRepo        bot.Repository
 	contextTimeout time.Duration
-	botAPI         *tgbotapi.BotAPI
 }
 
 // NewBotService will create new an botUsecase object representation of bot.Usecase interface
-func NewBotService(ur user.Repository, br bot.Repository, bAPI *tgbotapi.BotAPI, timeout time.Duration) Service {
+func NewBotService(ur user.Repository, br bot.Repository, timeout time.Duration) Service {
 
-	return &botUsecase{
+	b := &botUsecase{
 		userRepo:       ur,
 		botRepo:        br,
 		contextTimeout: timeout,
-		botAPI:         bAPI,
 	}
+
+	return b
+
 }
 
-func (a *botUsecase) Store(c context.Context, u *models.Bot) error {
+func (b *botUsecase) Get(c context.Context) (bot *models.Bot, err error) {
 
-	ctx, cancel := context.WithTimeout(c, a.contextTimeout)
+	ctx, cancel := context.WithTimeout(c, b.contextTimeout)
 	defer cancel()
 
-	err := a.botRepo.Store(ctx, u)
+	return b.botRepo.Get(ctx)
+}
+
+func (b *botUsecase) Update(c context.Context, upd tg.Update) (err error) {
+
+	ctx, cancel := context.WithTimeout(c, b.contextTimeout)
+	defer cancel()
+
+	user, err := b.botRepo.Update(ctx, upd)
+
 	if err != nil {
 		return err
 	}
-	return nil
-}
 
-func (a *botUsecase) Get(c context.Context) (*models.Bot, error) {
-
-	_, cancel := context.WithTimeout(c, a.contextTimeout)
-	defer cancel()
-
-	resBot, err := a.botAPI.GetMe()
-
+	err = b.userRepo.Store(ctx, user)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var b *models.Bot
-	b.ID = resBot.ID
-	b.Name = resBot.FirstName + " " + resBot.LastName
-	b.Username = resBot.UserName
-
-	return b, nil
+	return err
 }

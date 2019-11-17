@@ -30,16 +30,16 @@ func (s *logging) Store(ctx context.Context, u *models.User) (err error) {
 	return s.next.Store(ctx, u)
 }
 
-func (s *logging) GetByID(ctx context.Context, id int64) (user *models.User, err error) {
+func (s *logging) GetByTelegramID(ctx context.Context, tgID int) (user *models.User, err error) {
 	defer func(begin time.Time) {
 		s.logger.Log(
-			"method", "get_user_by_id",
-			"id", id,
+			"method", "get_user_by_tg_id",
+			"id", tgID,
 			"took", time.Since(begin),
 			"err", err,
 		)
 	}(time.Now())
-	return s.next.GetByID(ctx, id)
+	return s.next.GetByTelegramID(ctx, tgID)
 }
 
 func (s *logging) GetBot(ctx context.Context) (bot *models.Bot, err error) {
@@ -51,4 +51,16 @@ func (s *logging) GetBot(ctx context.Context) (bot *models.Bot, err error) {
 		)
 	}(time.Now())
 	return s.next.GetBot(ctx)
+}
+
+func (s *logging) GetAvatar(ctx context.Context, avatarID string) (b []byte, err error) {
+
+	defer func(begin time.Time) {
+		s.logger.Log(
+			"method", "get_user_avatar",
+			"took", time.Since(begin),
+			"err", err,
+		)
+	}(time.Now())
+	return s.next.GetAvatar(ctx, avatarID)
 }
