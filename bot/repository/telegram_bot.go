@@ -60,7 +60,7 @@ func (b *botRepository) Update(ctx context.Context, upd tg.Update) (user *models
 
 	user = new(models.User)
 
-	user.CreatedAt = time.Now()
+	user.CreatedAt = time.Now().Unix()
 	user.ExternalID = upd.Message.From.ID
 	user.Language = upd.Message.From.LanguageCode
 	user.Name = upd.Message.From.FirstName

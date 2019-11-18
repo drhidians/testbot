@@ -21,7 +21,7 @@ type postgresUserRepository struct {
 // NewPostgresUserRepository will create an object that represent the user.Repository interface
 func NewPostgresUserRepository(Conn *sql.DB) user.Repository {
 	//TO DO move to utils directory
-	stmt, err := Conn.Prepare(`CREATE Table IF NOT EXISTS users(id SERIAL PRIMARY KEY, external_id int, name varchar(50), username varchar(30), language varchar(10), avatar varchar(255), created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP);`)
+	stmt, err := Conn.Prepare(`CREATE Table IF NOT EXISTS users(id SERIAL PRIMARY KEY, external_id int, name varchar(50), username varchar(30), language varchar(10), avatar varchar(255), created_at TIMESTAMP with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP with time zone);`)
 	if err != nil {
 		panic(err)
 	}
@@ -59,10 +59,19 @@ func (p *postgresUserRepository) GetByTelegramID(ctx context.Context, tgID int) 
 	var avatar sql.NullString
 	var language sql.NullString
 
-	err = p.Conn.QueryRowContext(ctx, query, tgID).Scan(&u.ID, &u.Name, &u.CreatedAt, &updatedAt, &u.ExternalID, &username, &avatar, &language)
+	var createdAt pq.NullTime
+	err = p.Conn.QueryRowContext(ctx, query, tgID).Scan(&u.ID, &u.Name, &createdAt, &updatedAt, &u.ExternalID, &username, &avatar, &language)
 
-	u.UpdatedAt = &updatedAt.Time
-	u.Username = &username.String
+	if createdAt.Valid {
+		u.CreatedAt = createdAt.Time.Unix()
+	}
+	if updatedAt.Valid {
+		unixT := updatedAt.Time.Unix()
+		u.UpdatedAt = &unixT
+	}
+	if username.Valid {
+		u.Username = &username.String
+	}
 	if avatar.Valid {
 		u.Avatar = &avatar.String
 	}
@@ -91,7 +100,7 @@ func (p *postgresUserRepository) Store(ctx context.Context, u *models.User) (err
 	}
 
 	if err == nil {
-		query := `UPDATE users SET updated_at = NOW(), language = $2, avatar = $3 WHERE external_id = $1`
+		query := `UPDATE users SET updated_at = CURRENT_TIMESTAMP, language = $2, avatar = $3 WHERE external_id = $1`
 		stmt, err := p.Conn.PrepareContext(ctx, query)
 		if err != nil {
 			return err
@@ -105,7 +114,7 @@ func (p *postgresUserRepository) Store(ctx context.Context, u *models.User) (err
 		return err
 	}
 
-	query := `INSERT INTO users (external_id, username, name, avatar, language, created_at) VALUES ($1 , $2 , $3, $4 , $5, NOW())`
+	query := `INSERT INTO users (external_id, username, name, avatar, language, created_at) VALUES ($1 , $2 , $3, $4 , $5, CURRENT_TIMESTAMP)`
 
 	stmt, err := p.Conn.PrepareContext(ctx, query)
 	if err != nil {
