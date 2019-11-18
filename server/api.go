@@ -5,11 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"time"
 
+	cache "github.com/drhidians/testbot/middleware/http-cache"
+	"github.com/drhidians/testbot/middleware/http-cache/memory"
 	"github.com/drhidians/testbot/middleware/jwtauth"
 	userUcase "github.com/drhidians/testbot/user/usecase"
 	"github.com/go-chi/chi"
@@ -26,8 +29,28 @@ func (h *apiHandler) router() chi.Router {
 	r := chi.NewRouter()
 
 	r.Route("/media/{fileID}", func(r chi.Router) {
-		//r.Use(ArticleCtx)
-		r.Get("/", h.GetFile) // GET /articles/123
+
+		memcached, err := memory.NewAdapter(
+			memory.AdapterWithAlgorithm(memory.LRU),
+			memory.AdapterWithCapacity(10000),
+		)
+
+		if err != nil {
+			panic(err)
+		}
+
+		cacheClient, err := cache.NewClient(
+			cache.ClientWithAdapter(memcached),
+			cache.ClientWithTTL(24*60*time.Hour),
+			cache.ClientWithRefreshKey("opn"),
+		)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		r.Use(cacheClient.Middleware)
+		r.Get("/", h.GetFile)
 
 	})
 
