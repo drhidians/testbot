@@ -1,6 +1,7 @@
 # testbot
  Что делает это репозиторий : https://gist.github.com/mr-linch/27f112783b910d94c4cbfea09c73c090 .
-параметры командной строки:
+ 
+# параметры командной строки:
 
 db - строка для подключения к базе данных (postgres://user:pass@host:port/dbname)
 
