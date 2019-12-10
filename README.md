@@ -123,5 +123,5 @@ GET https://{domain}/media/{file_id}
 
 # TO DO
 
-- unit test's
-- merging telegram bot pkg as new service.
+- unit test's bot service
+- unit test's user service

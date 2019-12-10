@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	tg "github.com/drhidians/testbot"
 	botUcase "github.com/drhidians/testbot/bot/usecase"
 	"github.com/drhidians/testbot/middleware/ipchecker"
-	tg "github.com/drhidians/testbot/telegram"
 	"github.com/go-chi/chi"
 	kitlog "github.com/go-kit/kit/log"
 )

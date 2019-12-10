@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	tg "github.com/drhidians/testbot"
 	"github.com/drhidians/testbot/models"
-	tg "github.com/drhidians/testbot/telegram"
 	"github.com/go-kit/kit/log"
 )
 

@@ -7,8 +7,8 @@ import (
 	"github.com/drhidians/testbot/models"
 	"github.com/drhidians/testbot/user"
 
+	tg "github.com/drhidians/testbot"
 	"github.com/drhidians/testbot/bot"
-	tg "github.com/drhidians/testbot/telegram"
 )
 
 // Service represent the bot's usecases

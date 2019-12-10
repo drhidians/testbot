@@ -3,8 +3,8 @@ package bot
 import (
 	"context"
 
+	tg "github.com/drhidians/testbot"
 	"github.com/drhidians/testbot/models"
-	tg "github.com/drhidians/testbot/telegram"
 )
 
 // Repository represent the bot's repository contract

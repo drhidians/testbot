@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	tg "github.com/drhidians/testbot/telegram"
+	tg "github.com/drhidians/testbot"
 )
 
 var callCommand func(u *tg.Update) error

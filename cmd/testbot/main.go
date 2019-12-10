@@ -26,7 +26,7 @@ import (
 	_botRepo "github.com/drhidians/testbot/bot/repository"
 	_botUcase "github.com/drhidians/testbot/bot/usecase"
 
-	tg "github.com/drhidians/testbot/telegram"
+	tg "github.com/drhidians/testbot"
 )
 
 func init() {

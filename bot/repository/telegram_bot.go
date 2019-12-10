@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
+	tg "github.com/drhidians/testbot"
 	"github.com/drhidians/testbot/bot"
 	"github.com/drhidians/testbot/middleware/jwtauth"
 	"github.com/drhidians/testbot/models"
-	tg "github.com/drhidians/testbot/telegram"
 )
 
 const (
